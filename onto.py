@@ -20,6 +20,9 @@ Usage:
   onto add-dataprop FILE --iri :age [--label "..."] [--domain :A] [--range xsd:integer]
   onto add-individual FILE --iri :inst [--type :Foo] [--label "..."]
   onto add-annotation FILE --entity :Foo --prop rdfs:comment --text "..." [--lang en]
+  onto add-disjoint FILE --classes :A :B [:C ...]     # disjointWith (2) / AllDisjointClasses (3+)
+  onto add-characteristic FILE --prop :p --type functional|inverse-functional|transitive|symmetric|asymmetric|reflexive|irreflexive
+  onto add-inverse FILE --prop :p --inverse :q        # :p owl:inverseOf :q
   onto remove      FILE --iri :Foo            # remove entity + every triple mentioning it
   onto remove-subclass FILE --child :Foo --parent :Bar
   onto validate    FILE [--reason]            # parse + structural checks (+ HermiT consistency)
@@ -35,7 +38,8 @@ import re
 import sys
 import tempfile
 
-from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib import BNode, Graph, Literal, Namespace, URIRef
+from rdflib.collection import Collection
 from rdflib.namespace import OWL, RDF, RDFS, XSD
 
 # WebProtégé/OWLAPI round-trips a plain literal like "user@dept.edu" out as
@@ -304,6 +308,79 @@ def cmd_remove_subclass(g, a):
     print(f"removed {a.child} subClassOf {a.parent}  (-1 triple)")
 
 
+# property characteristics, mapped to their OWL class. functional applies to
+# object *and* data properties; the rest are object-property only.
+CHARACTERISTIC = {
+    "functional": OWL.FunctionalProperty,
+    "inverse-functional": OWL.InverseFunctionalProperty,
+    "transitive": OWL.TransitiveProperty,
+    "symmetric": OWL.SymmetricProperty,
+    "asymmetric": OWL.AsymmetricProperty,
+    "reflexive": OWL.ReflexiveProperty,
+    "irreflexive": OWL.IrreflexiveProperty,
+}
+_OBJECT_ONLY = set(CHARACTERISTIC) - {"functional"}
+
+
+def prop_kind(g, uri):
+    if is_kind(g, uri, "objprop"):
+        return "objprop"
+    if is_kind(g, uri, "dataprop"):
+        return "dataprop"
+    return None
+
+
+def cmd_add_disjoint(g, a):
+    cls = []
+    for c in a.classes:
+        u = expand(g, c)
+        require(g, u, "class", "disjoint member")
+        if u not in cls:
+            cls.append(u)
+    if len(cls) < 2:
+        die("need at least 2 distinct classes for --classes")
+    if len(cls) == 2:
+        added(g, [(cls[0], OWL.disjointWith, cls[1])], a.file, a.out,
+              f"declared {short(g, cls[0])} disjointWith {short(g, cls[1])}")
+        return
+    # n-ary: owl:AllDisjointClasses, deduped by member set
+    target = set(cls)
+    for ax in g.subjects(RDF.type, OWL.AllDisjointClasses):
+        for members in g.objects(ax, OWL.members):
+            if set(Collection(g, members)) == target:
+                print("no change (equivalent AllDisjointClasses already present)")
+                return
+    axiom, lst = BNode(), BNode()
+    Collection(g, lst, cls)
+    g.add((axiom, RDF.type, OWL.AllDisjointClasses))
+    g.add((axiom, OWL.members, lst))
+    save(g, a.file, a.out)
+    names = ", ".join(short(g, c) for c in cls)
+    print(f"declared AllDisjointClasses over {len(cls)} classes: {names}")
+
+
+def cmd_add_characteristic(g, a):
+    p = expand(g, a.prop)
+    kind = prop_kind(g, p)
+    if kind is None:
+        die(f"property {a.prop} is not a declared object/data property "
+            f"(refusing to characterize a non-existent property; declare it first)")
+    if a.type in _OBJECT_ONLY and kind != "objprop":
+        die(f"characteristic '{a.type}' applies only to object properties; "
+            f"{a.prop} is a {kind}")
+    added(g, [(p, RDF.type, CHARACTERISTIC[a.type])], a.file, a.out,
+          f"declared {a.prop} as {a.type} property")
+
+
+def cmd_add_inverse(g, a):
+    p = expand(g, a.prop)
+    require(g, p, "objprop", "property")
+    q = expand(g, a.inverse)
+    require(g, q, "objprop", "inverse")
+    added(g, [(p, OWL.inverseOf, q)], a.file, a.out,
+          f"declared {a.prop} inverseOf {a.inverse}")
+
+
 def cmd_validate(g, a):
     problems = []
     classes = set(g.subjects(RDF.type, OWL.Class))
@@ -478,6 +555,20 @@ def build_parser():
     s.add_argument("--entity", required=True); s.add_argument("--prop", required=True)
     s.add_argument("--text", required=True)
     s.set_defaults(fn=cmd_add_annotation)
+
+    s = sub.add_parser("add-disjoint"); common(s)
+    s.add_argument("--classes", required=True, nargs="+", metavar="CLASS",
+                   help="2 classes -> disjointWith; 3+ -> AllDisjointClasses")
+    s.set_defaults(fn=cmd_add_disjoint)
+
+    s = sub.add_parser("add-characteristic"); common(s)
+    s.add_argument("--prop", required=True)
+    s.add_argument("--type", required=True, choices=sorted(CHARACTERISTIC))
+    s.set_defaults(fn=cmd_add_characteristic)
+
+    s = sub.add_parser("add-inverse"); common(s)
+    s.add_argument("--prop", required=True); s.add_argument("--inverse", required=True)
+    s.set_defaults(fn=cmd_add_inverse)
 
     s = sub.add_parser("remove"); common(s); s.add_argument("--iri", required=True)
     s.set_defaults(fn=cmd_remove)

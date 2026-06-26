@@ -1,6 +1,23 @@
 # Current Status
 
-> 최종 업데이트: 2026-06-26 (세션 3 — S2 reasoner 강화)
+> 최종 업데이트: 2026-06-26 (세션 3 — S2 reasoner + 공리 하드닝 명령)
+
+---
+
+## Session 2026-06-26 (3b) — 공리 하드닝 명령(CLI) + 실데이터 필드테스트
+
+**CLI 작업 vs 온톨로지 구축 구분**: 새 `onto` 명령 = CLI 작업(이 repo). 그 명령으로 PI 온톨로지를 실제로 고치는 것 = 온톨로지 구축(study_abroad). 이번엔 **복사본/테스트만** — study_abroad 캐노니컬 불변.
+
+### CLI 작업 (이 repo에 커밋)
+- `onto` 공리 명령 3종 추가: `add-disjoint`(2개→disjointWith, 3+→AllDisjointClasses, 멤버셋 멱등), `add-characteristic`(functional/inverse-functional/transitive/symmetric/asymmetric/reflexive/irreflexive, object-only 가드), `add-inverse`. 전부 존재검사(안티-할루시네이션). 단위테스트 24/24.
+
+### 필드테스트 (복사본·합성, throwaway 계정 — 미커밋)
+- 실 PI 온톨로지(2064트리플) 복사본에 핵심 세트(상위12 AllDisjoint + Applicant⊥PI + functional 7개=tier/recruiting/inCountry/inUniversity/year/city/rank) 적용 → `validate --reason` **consistent**(2098트리플).
+- **네거티브 검증**(공리 실효성): Columbia를 University+Country로 → INCONSISTENT, TTIC에 도시 2개 → INCONSISTENT. 공리가 실제로 모델링 에러를 잡음.
+- **라이브 라운드트립**(합성 ontology, S1 회피): create→apply-edits→export에서 AllDisjointClasses/Functional/Symmetric 전부 보존. apply-edits 변경수=OWL **축** 수(3)와 일치 → **WebProtégé MergeUpload가 새 공리 타입을 올바르게 diff/저장/재export**(긍정 발견, issues #13).
+
+### 다음
+- ② skill화, 또는 남은 강화(S3 pre-flight IRI / S5 prune-reification / S6 state-based waits / `wp sync`·`wp delete`). 실 PI 온톨로지에 공리 영구 반영은 study_abroad 세션에서 별도 결정.
 
 ---
 

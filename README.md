@@ -103,9 +103,26 @@ wp apply-edits my-ontology -f "$F" -m "add Pump + drives"
 > avoids the problem entirely. See [`docs/strengthening.md`](docs/strengthening.md).
 
 `onto` commands: `info`, `add-class`, `add-subclass`, `add-objprop`, `add-dataprop`,
-`add-individual`, `add-annotation`, `remove`, `remove-subclass`, `validate [--reason]`,
-`query "<SPARQL>"`. IRIs accept full `http(s)://…`, prefixed names bound in the file
-(`rdfs:comment`, `ex:Foo`), or `:Name`/`Name` against the default namespace.
+`add-individual`, `add-annotation`, `add-disjoint`, `add-characteristic`, `add-inverse`,
+`remove`, `remove-subclass`, `validate [--reason]`, `query "<SPARQL>"`. IRIs accept full
+`http(s)://…`, prefixed names bound in the file (`rdfs:comment`, `ex:Foo`), or `:Name`/`Name`
+against the default namespace.
+
+Axiom hardening (disjointness, property characteristics) goes through the same checked path:
+
+```bash
+# 2 classes -> owl:disjointWith ; 3+ -> a single owl:AllDisjointClasses axiom
+.venv/bin/python onto.py add-disjoint "$F" --classes :Cat :Dog :Fish
+# functional | inverse-functional | transitive | symmetric | asymmetric | reflexive | irreflexive
+.venv/bin/python onto.py add-characteristic "$F" --prop :age      --type functional
+.venv/bin/python onto.py add-characteristic "$F" --prop :sibling  --type symmetric
+.venv/bin/python onto.py add-inverse        "$F" --prop :parentOf --inverse :childOf
+#   each refuses to characterize/relate a property or class that isn't declared first.
+```
+
+These survive the `apply-edits` round-trip intact: WebProtégé diffs by OWL *axiom* (not triple),
+so adding the three axioms above shows up as exactly 3 changes, and a re-`export` returns the
+`AllDisjointClasses` / `FunctionalProperty` / `SymmetricProperty` assertions unchanged.
 
 Debug a flow visually:
 

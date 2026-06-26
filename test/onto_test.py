@@ -62,6 +62,21 @@ def main():
     run(f, "remove", "--iri", ":C")
     check(":C removed", "Cee" not in open(f).read() and ":C " not in open(f).read())
 
+    # axiom commands: add-characteristic / add-disjoint / add-inverse
+    run(f, "add-objprop", "--iri", ":rel", "--domain", ":A", "--range", ":A")
+    run(f, "add-characteristic", "--prop", ":rel", "--type", "transitive")
+    check("characteristic written", "owl:TransitiveProperty" in open(f).read())
+    run(f, "add-characteristic", "--prop", ":ghostProp", "--type", "functional", expect=1)
+    run(f, "add-characteristic", "--prop", ":rel", "--type", "functional")  # functional ok on objprop
+    run(f, "add-class", "--iri", ":D", "--label", "Dee")
+    run(f, "add-disjoint", "--classes", ":A", ":D")
+    check("pairwise disjointWith written", "owl:disjointWith" in open(f).read())
+    run(f, "add-disjoint", "--classes", ":A", ":B", ":D")
+    check("AllDisjointClasses written", "AllDisjointClasses" in open(f).read())
+    r = run(f, "add-disjoint", "--classes", ":D", ":A", ":B")  # reordered -> idempotent
+    check("AllDisjointClasses idempotent", "no change" in r.stdout)
+    run(f, "add-inverse", "--prop", ":rel", "--inverse", ":ghostRel", expect=1)  # inverse must exist
+
     # validate clean
     run(f, "validate")
 

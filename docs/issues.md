@@ -197,3 +197,19 @@ HermiT가 `xsd:gYear` 등 OWL2 datatype map 밖 타입 거부(`UnsupportedDataty
 **상태: ⏸️ 보류 (2026-06-26)** — low
 
 엔티티가 reified `rdf:Statement`의 subject/object면 remove 후 blank node가 남음. 향후 `--prune-reification` 옵션.
+
+## Issue #13: apply-edits가 공리(AllDisjointClasses/characteristics)를 올바르게 다루는가? — YES
+
+**상태: ✅ 확인됨 (2026-06-26)** — positive finding
+
+### 질문
+
+`add-disjoint`/`add-characteristic`로 만든 공리(특히 bnode 기반 `owl:AllDisjointClasses`, property characteristic)가 `apply-edits`(MergeUpload) diff·저장·재export를 통과하는지 불확실했음(S1처럼 조용히 누락될 위험).
+
+### 검증
+
+합성 ontology(Cat/Dog/Fish + livesWith/age)로 create→apply-edits(하드닝본)→export 라이브 실행:
+- apply-edits 변경수 = **3** = 추가한 OWL **축** 수(AllDisjointClasses 1 + FunctionalProperty 1 + SymmetricProperty 1). WebProtégé는 트리플이 아니라 **OWL 축 단위**로 diff함.
+- export 결과에 `owl:AllDisjointClasses` + `owl:members ( :Cat :Dog … )`, `owl:FunctionalProperty`, `owl:SymmetricProperty` 모두 보존.
+
+→ 공리 하드닝 명령은 push 경로(file→WebProtégé)에서 안전. (오프라인에선 HermiT가 disjoint/functional 위반을 INCONSISTENT로 잡는 것도 실데이터로 확인.)

@@ -29,8 +29,11 @@
   - [x] Ontology IRI 보존 — save 시 변경되면 abort (2026-06-26)
   - [x] 단위테스트 `test/onto_test.py` 8/8 (2026-06-26)
 - [x] 통합 워크플로우 라이브 실증: export(IRI 보존) → `onto` 편집 → `wp apply-edits` 반영 (2026-06-26)
+- [x] 공리 하드닝 명령 `add-disjoint`(disjointWith/AllDisjointClasses) / `add-characteristic`(functional·inverse-functional·transitive·symmetric·asymmetric·reflexive·irreflexive) / `add-inverse` — 존재검사+멱등, 단위테스트 포함(24/24) (2026-06-26)
+- [x] 공리 하드닝 라이브 실증: create→apply-edits→export 라운드트립에서 AllDisjointClasses/Functional/Symmetric 보존, 변경수=OWL 축 수 (2026-06-26)
 - [ ] (선택) `wp sync` 단일 래퍼로 3스텝 자동화
 - [ ] merge preview의 변경 건수/내용 정밀 파싱(현재 근사치)
+- [ ] (선택) `add-cardinality`(min/max/exact 제약) — 현재는 functional로 "≤1"만 커버
 
 ## 2c. 강화 (실데이터 ~2000트리플 실험 발견 — 상세 `strengthening.md`)
 
