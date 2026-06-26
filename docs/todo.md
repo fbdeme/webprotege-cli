@@ -32,6 +32,18 @@
 - [ ] (선택) `wp sync` 단일 래퍼로 3스텝 자동화
 - [ ] merge preview의 변경 건수/내용 정밀 파싱(현재 근사치)
 
+## 2c. 강화 (실데이터 ~2000트리플 실험 발견 — 상세 `strengthening.md`)
+
+- [x] (S1) `onto` load 새니타이저: WebProtégé가 깨뜨린 `@` 이메일 리터럴 복구 (2026-06-26)
+- [x] (S3) `apply-edits` 0-change 경고(IRI 불일치 안내) (2026-06-26)
+- [x] (S4) `onto info` class-instance 카운트 추가 (2026-06-26)
+- [ ] (S1) **README에 "파일=진실원" 패턴 명문화** — WebProtégé export를 편집 베이스로 쓰지 말 것
+- [ ] (S1) 임베디드 이메일(자유텍스트 내) 라인지향 복구(필요 시)
+- [ ] (S2) `validate --reason` Pellet fallback + datatype 미지원 메시지 개선
+- [ ] (S3) `apply-edits` 업로드 전 IRI 사전 비교 체크
+- [ ] (S5) `onto remove --prune-reification`
+- [ ] (S6) Playwright 고정 대기 → 상태기반 대기(대용량/느린 인스턴스 대비)
+
 ## 3. 테스트 / 검증
 
 - [x] 라이브 e2e (create→list→export→내용 검증) — `npm test` PASS (2026-06-26)

@@ -123,6 +123,11 @@ program
       const r = await wp.applyExternalEdits({ name, file: opts.file, message: opts.message });
       const n = r.changeCount != null ? ` (~${r.changeCount} change(s))` : '';
       console.log(`applied external edits to ${name}${n}`);
+      if (r.changeCount === 0) {
+        console.error('warning: 0 changes applied. The merge only diffs ontologies with the SAME '
+          + 'ontology IRI — if the uploaded file\'s IRI differs from the project\'s, nothing is '
+          + 'applied. Check `onto info <file>` vs the project, or the file may be identical.');
+      }
     });
   });
 

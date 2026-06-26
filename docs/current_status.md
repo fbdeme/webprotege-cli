@@ -1,6 +1,26 @@
 # Current Status
 
-> 최종 업데이트: 2026-06-26 (MVP 동작 — create/list/export 라이브 검증 완료)
+> 최종 업데이트: 2026-06-26 (실데이터 강화 조사 — `strengthening.md`)
+
+---
+
+## Session 2026-06-26 (2) — 실데이터 강화 조사
+
+실 PI 온톨로지(~2000 트리플, reification·다국어·이메일)로 CLI를 굴려 한계 탐색. 상세: `strengthening.md`.
+
+### 발견 (전부 재현·증거 기반)
+- **S1 (high)**: WebProtégé 라운드트립이 `@` 리터럴(이메일)을 깨진 lang-tag로 변환 → export 파싱 불가(Turtle+RDF/XML 모두). 임베디드 이메일은 구조 파손. → `onto` 새니타이저(단순 40/40 복구) + **"캐노니컬 파일=진실원" 가이드**(export를 편집 베이스로 쓰지 말 것).
+- **S2 (med)**: `validate --reason`가 `xsd:gYear` 등에서 HermiT 중단 → graceful degrade, Pellet fallback 계획.
+- **S3 (med, 해결)**: `apply-edits` IRI 불일치 시 조용한 무반영 → 0-change 경고 추가.
+- **S4 (low, 해결)**: `onto info` 개체 카운트 누락 → class-instance 카운트 추가.
+- **S5/S6 (low)**: remove의 reification 고아화, Playwright 고정대기 → 계획.
+
+### 이번에 적용한 수정
+- `onto.py`: 새니타이저(S1), info 카운트(S4). `src/cli.js`: apply-edits 0-change 경고(S3).
+- 단위테스트 8/8 유지. push 영역(파일→WebProtégé)은 실 규모에서 견고.
+
+### 다음
+- README "파일=진실원" 반영(완료), 나머지 계획 항목은 `todo.md` §2c.
 
 ---
 

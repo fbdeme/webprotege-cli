@@ -153,3 +153,44 @@ merge-upload(파일→프로젝트 반영)가 어떤 경우 아무 변경도 적
 
 `applyExternalEdits`가 두 다이얼로그를 모두 처리: 파일→OK → "Changes to be applied" 대기 →
 (commit message 입력) → 2차 OK.
+
+---
+
+> 아래 #8~#12는 실데이터(~2000 트리플) 실험에서 발견 — 상세·근거·계획은 `strengthening.md` 참조.
+
+## Issue #8: WebProtégé 라운드트립이 `@` 리터럴(이메일)을 깨뜨림
+
+**상태: 🔄 부분해결 (2026-06-26)** — high
+
+### 문제/원인
+
+plain literal `"user@dept.edu"` → WebProtégé export에서 `"user"@dept.edu`(도메인=언어태그). 점 든 lang tag는 Turtle/RDF 위반 → rdflib 거부. Turtle뿐 아니라 RDF/XML(`xml:lang`)도 동일 → **저장값 자체 손상**. 자유 텍스트에 박힌 이메일은 뒤 텍스트가 dangling되어 구조 파손. 실데이터에서 ~40건.
+
+### 해결 방법
+
+- (shipped) `onto` load 새니타이저: `"…"@<점든태그>` → 따옴표 안으로 재결합(단순 이메일 40/40 복구). 임베디드 케이스는 불완전.
+- (guidance) **캐노니컬 파일을 진실원으로** — WebProtégé export를 편집 베이스로 쓰지 말 것. 편집은 파일에서 `onto`, 반영은 `apply-edits`로 push만.
+
+## Issue #9: `validate --reason`가 OWL2 외 datatype에서 중단
+
+**상태: ⏸️ 보류/문서화 (2026-06-26)** — med
+
+HermiT가 `xsd:gYear` 등 OWL2 datatype map 밖 타입 거부(`UnsupportedDatatypeException`). graceful degrade는 됨. 계획: Pellet fallback + 명확한 메시지. parse/structural `validate`는 영향 없음.
+
+## Issue #10: `apply-edits` IRI 불일치 시 조용한 무반영
+
+**상태: ✅ 해결됨 (2026-06-26)** — med
+
+업로드 온톨로지 IRI≠프로젝트 IRI → merge 0건인데 "applied (~0)" exit 0. → 0 changes일 때 경고 출력(원인=IRI 불일치 안내). 향후: 업로드 전 IRI 사전 비교.
+
+## Issue #11: `onto info` 개체 카운트 누락
+
+**상태: ✅ 해결됨 (2026-06-26)** — low
+
+`owl:NamedIndividual`만 세어 `a :Class`로만 선언된 개체(실데이터 241명)를 0으로 표시. → "owl:NamedIndividual N개, class instance M개" 둘 다 출력.
+
+## Issue #12: `onto remove`가 reification blank node 고아화
+
+**상태: ⏸️ 보류 (2026-06-26)** — low
+
+엔티티가 reified `rdf:Statement`의 subject/object면 remove 후 blank node가 남음. 향후 `--prune-reification` 옵션.

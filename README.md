@@ -95,6 +95,13 @@ F=$(find work -name '*.ttl')
 wp apply-edits my-ontology -f "$F" -m "add Pump + drives"
 ```
 
+> **Keep a canonical file as the source of truth.** Prefer editing the ontology file you
+> already control (e.g. in git) and using `apply-edits` to *push* to WebProtégé for viewing.
+> Round-tripping *through* WebProtégé is lossy: its export mangles any literal containing `@`
+> (emails become invalid language-tagged literals), so building edits on a fresh `wp export` can
+> corrupt those values. `onto` repairs the simple case on load, but the canonical-file route
+> avoids the problem entirely. See [`docs/strengthening.md`](docs/strengthening.md).
+
 `onto` commands: `info`, `add-class`, `add-subclass`, `add-objprop`, `add-dataprop`,
 `add-individual`, `add-annotation`, `remove`, `remove-subclass`, `validate [--reason]`,
 `query "<SPARQL>"`. IRIs accept full `http(s)://…`, prefixed names bound in the file

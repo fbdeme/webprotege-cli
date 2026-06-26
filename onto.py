@@ -31,11 +31,23 @@ or :Name / Name resolved against the ontology's default namespace.
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS, XSD
+
+# WebProtégé/OWLAPI round-trips a plain literal like "user@dept.edu" out as
+#   "user"@dept.edu  — i.e. it treats the domain as a language tag. But a BCP47
+# language tag can never contain a '.', so this is invalid Turtle/RDF and rdflib
+# (correctly) refuses to load it. Any "..."@<tag-with-a-dot> is therefore an
+# unambiguously mangled literal; re-join it into the quoted string.
+_MANGLED_LANGTAG = re.compile(r'"((?:[^"\\]|\\.)*)"@([A-Za-z0-9-]+(?:\.[A-Za-z0-9.-]+))')
+
+
+def _sanitize_turtle(text):
+    return _MANGLED_LANGTAG.subn(r'"\1@\2"', text)
 
 KIND_TYPE = {
     "class": OWL.Class,
@@ -55,9 +67,18 @@ def load(path):
     if not os.path.exists(path):
         die(f"file not found: {path}")
     g = Graph(bind_namespaces="none")  # keep only the file's own prefixes (clean output)
-    fmt = "xml" if path.lower().endswith((".owl", ".rdf", ".xml")) else None
+    is_xml = path.lower().endswith((".owl", ".rdf", ".xml"))
     try:
-        g.parse(path, format=fmt)
+        if is_xml:
+            g.parse(path, format="xml")
+        else:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            text, n = _sanitize_turtle(text)
+            if n:
+                print(f"note: repaired {n} mangled language-tag literal(s) from WebProtégé "
+                      f"export (e.g. emails)", file=sys.stderr)
+            g.parse(data=text, format="turtle")
     except Exception as e:
         die(f"could not parse {path}: {e}")
     bound = dict(g.namespaces())
@@ -168,12 +189,17 @@ def _fmt_o(g, o):
 def cmd_info(g, a):
     oi = ontology_iri(g)
     counts = {k: len(set(g.subjects(RDF.type, t))) for k, t in KIND_TYPE.items()}
+    classes = set(g.subjects(RDF.type, OWL.Class))
+    # "instances" = anything typed with a declared class (covers individuals that are only
+    # `a :SomeClass`, not just explicit owl:NamedIndividual)
+    instances = {s for s, _, o in g.triples((None, RDF.type, None)) if o in classes}
     print(f"ontology IRI : {oi or '(anonymous!)'}")
     if not oi:
         print("  WARNING: anonymous ontology — `wp apply-edits` will NOT apply changes")
     print(f"triples      : {len(g)}")
-    for k in ("class", "objprop", "dataprop", "individual", "annprop"):
+    for k in ("class", "objprop", "dataprop", "annprop"):
         print(f"{k:12s} : {counts[k]}")
+    print(f"individuals  : {counts['individual']} owl:NamedIndividual, {len(instances)} class instance(s)")
     print("prefixes     :")
     for p, n in sorted(g.namespaces()):
         print(f"  {p or '(default)'}: {n}")
