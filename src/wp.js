@@ -161,6 +161,52 @@ export class WebProtegeClient {
     return { name };
   }
 
+  /** Open a project in the editor (navigates to #projects/<id>/edit/...). */
+  async openProject(name) {
+    await this.goHome();
+    if (!(await this.isSignedIn())) throw new Error('not signed in');
+    await this.page.waitForTimeout(GWT_SETTLE_MS);
+    const row = this.page.locator('.wp-project-list__rows__row', { hasText: name }).first();
+    if ((await row.count()) === 0) throw new Error('project not found: ' + name);
+    await row.locator('.wp-project-list__name-col').first().click();
+    await this.page.waitForFunction(() => /\/edit\//.test(location.hash), null, { timeout: 30000 });
+    await this.page.waitForTimeout(2000);
+  }
+
+  /**
+   * Apply an externally-edited ontology to an existing project (Project ▸ Apply External
+   * Edits). WebProtégé diffs the uploaded ontology against the project's current ontology
+   * (add + remove) and commits the delta as a new revision — so uploading the full edited
+   * file makes the project match it exactly.
+   *
+   * IMPORTANT: the uploaded ontology MUST carry the SAME ontology IRI as the project's,
+   * otherwise the diff is skipped and nothing is applied (see references/control-surface.md).
+   * @param {{name:string, file:string}} o
+   */
+  async applyExternalEdits({ name, file, message }) {
+    const abs = path.resolve(file);
+    if (!fs.existsSync(abs)) throw new Error('file not found: ' + abs);
+    await this.openProject(name);
+    await this.page.getByRole('button', { name: /Project/ }).first().click();
+    await this.page.waitForTimeout(400);
+    await this.page.getByText('Apply External Edits', { exact: true }).first().click();
+    // Step 1 — "Upload ontologies" dialog: choose the edited file, OK.
+    await this.page.waitForTimeout(900);
+    await this.page.locator('input[type=file]').first().setInputFiles(abs);
+    await this.page.waitForTimeout(900);
+    await this._shot('merge-upload-filled');
+    await this.page.getByRole('button', { name: 'OK', exact: true }).click();
+    // Step 2 — "Merge ontologies" preview: server computed the add/remove diff. Confirm it.
+    await this.page.getByText('Changes to be applied', { exact: false }).first().waitFor({ timeout: 30000 });
+    const changeCount = await this.page.locator('text=/^\\[ontology\\]/').count().catch(() => null);
+    await this._shot('merge-preview');
+    if (message) await this.page.locator('textarea').first().fill(message);
+    await this.page.getByRole('button', { name: 'OK', exact: true }).click();
+    await this.page.waitForTimeout(2500);
+    await this._shot('merge-done');
+    return { name, changeCount };
+  }
+
   /**
    * Download a project's ontology. WebProtégé serves a ZIP containing the serialized
    * ontology in the chosen syntax.

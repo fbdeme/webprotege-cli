@@ -58,6 +58,11 @@ wp projects --json                        # machine-readable
 wp export my-ontology -F Turtle -o my-ontology.ttl.zip
 #   formats: RDF/XML | Turtle | OWL/XML | Manchester OWL Syntax | Functional OWL Syntax
 #   WebProtégé serves the ontology as a ZIP containing the serialized file.
+
+# push an externally-edited ontology back into a project:
+# WebProtégé diffs it (add + remove) and commits the delta as a new revision.
+wp apply-edits my-ontology -f edited.owl -m "add Foo, drop Bar"
+#   the edited file MUST keep the SAME ontology IRI as the project, or nothing is applied.
 ```
 
 Debug a flow visually:
@@ -82,11 +87,17 @@ await wp.close();
 
 ## Status / scope
 
-Working: `signup`, `login`, `projects`, `create` (from file), `export`. Selectors are pinned to
-WebProtégé `4.0.0-beta-3` — pin the image to keep them valid. Roadmap and known limits live in
-[`docs/`](docs/) (`current_status.md`, `todo.md`, `issues.md`). Notably **not** yet covered:
-fine-grained in-app entity edits (create class/property/individual, add axioms) and a raw-HTTP
-fast-path for read-only exports.
+Working: `signup`, `login`, `projects`, `create` (from file), `export`, `apply-edits`
+(push an edited ontology back as a diff/revision via *Apply External Edits*). Selectors are
+pinned to WebProtégé `4.0.0-beta-3` — pin the image to keep them valid.
+
+**Editing approach (hybrid):** rather than have an LLM rewrite raw Turtle (hallucination-prone),
+the intended flow is `export` → edit the file with *structured, validated* operations
+(planned: owlready2-backed `add-class`/`add-subclass`/… with existence checks + reasoner) →
+`apply-edits` to sync the change back into the live project. `apply-edits` (the write-back
+bridge) works today; the structured edit engine is the next milestone.
+
+Roadmap and known limits: [`docs/`](docs/) (`current_status.md`, `todo.md`, `issues.md`).
 
 ## License
 

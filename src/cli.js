@@ -113,6 +113,20 @@ program
   });
 
 program
+  .command('apply-edits <name>')
+  .description('apply an externally-edited ontology to a project (server diffs add+remove, commits a new revision)')
+  .requiredOption('-f, --file <path>', 'edited ontology file — MUST keep the same ontology IRI as the project')
+  .option('-m, --message <text>', 'commit message for the revision')
+  .action(async (name, opts) => {
+    await run(async (wp) => {
+      await wp.signIn(creds());
+      const r = await wp.applyExternalEdits({ name, file: opts.file, message: opts.message });
+      const n = r.changeCount != null ? ` (~${r.changeCount} change(s))` : '';
+      console.log(`applied external edits to ${name}${n}`);
+    });
+  });
+
+program
   .command('export <name>')
   .description('download a project ontology (served as a ZIP)')
   .option('-F, --format <fmt>', 'RDF/XML | Turtle | OWL/XML | Manchester OWL Syntax | Functional OWL Syntax', 'RDF/XML')

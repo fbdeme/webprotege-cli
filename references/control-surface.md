@@ -104,6 +104,36 @@ once via the browser, reuse the `JSESSIONID` cookie, and hit `/download` (plain 
 exports — skipping a browser launch when only an export is needed. The write path stays on the
 browser.
 
+## 5. The write-back bridge: "Apply External Edits" (verified)
+
+WebProtégé can ingest an externally-edited copy of a project's ontology and apply the
+*difference* as a normal revision. This is the bridge that lets you edit the ontology as a
+file (safely, with validation/reasoning) and push the result back into the live project.
+
+- **UI path:** open the project → **Project ▸ Apply External Edits** → *Upload ontologies*
+  dialog (pick file → OK) → *Merge ontologies* dialog (shows the computed change list +
+  a commit message → OK).
+- **Semantics (decompiled + live-verified):** `MergeUploadedProjectActionHandler` loads the
+  uploaded ontology and computes a **bidirectional axiom + annotation diff** against the
+  project's current ontology (`AxiomDiffCalculator`: added = in upload ∖ project, removed =
+  in project ∖ upload), then commits the whole delta as **one new revision** with your
+  message. So uploading the *full* edited file makes the project match it exactly —
+  additions **and deletions** propagate.
+- **Hard constraint:** the uploaded ontology must carry the **same, non-anonymous Ontology
+  IRI** as the project's (`ModifiedProjectOntologiesCalculator.isDifferentVersionOfOntology`
+  requires equal IRIs). If the IRI differs or is anonymous, the diff is skipped and **nothing
+  is applied** — silently. Always preserve the ontology IRI when round-tripping.
+- **Permissions:** requires the project-level `UPLOAD_AND_MERGE` + `EDIT_ONTOLOGY` actions
+  (the project owner has both).
+
+Live verification: created a project from a 2-class ontology, edited the file to add a class
+(+ annotation + subclass) and remove a label, ran Apply External Edits → export confirmed the
+addition and the deletion both took effect, untouched axioms preserved, and a new revision
+(R2) was recorded with the commit message, author, and per-axiom change list.
+
+`webprotege-cli` automates this as `wp apply-edits <project> -f <edited-file> -m <message>`
+(it drives both dialogs and confirms the merge).
+
 ## Reproducing these findings
 ```bash
 # pull a JAR out of the running container and decompile a class

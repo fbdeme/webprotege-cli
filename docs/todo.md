@@ -17,10 +17,18 @@
 - [x] `projects` 목록 (`--json`) (2026-06-26)
 - [x] `create` — OWL 파일로 프로젝트 생성 (2026-06-26)
 - [x] `export` — 포맷 선택 ZIP 다운로드 (2026-06-26)
+- [x] `apply-edits` — Apply External Edits(파일→프로젝트 양방향 merge, 새 리비전) + `openProject` (2026-06-26)
 - [ ] `delete` — 프로젝트 휴지통 이동 (테스트 정리·관리용)
 - [ ] `export --unzip` — ZIP 자동 해제해 단일 파일 저장
-- [ ] `open` — 프로젝트 URL 출력/브라우저 오픈
-- [ ] 인앱 편집 스파이크: `add-class` / `add-property` / `add-individual` (가치·안정성 평가 후)
+
+## 2b. 하이브리드 편집 (다음 단계)
+
+- [ ] 구조화 편집 엔진(owlready2/rdflib): `add-class`/`add-subclass`/`add-objprop`/`add-annotation`/`remove`
+  - [ ] 각 명령 = 엔티티 존재검사 + delta 적용 + parse 검증
+  - [ ] `validate` = 일관성/추론 검사(HermiT)
+  - [ ] Ontology IRI 보존(apply-edits 전제) 보장
+- [ ] 통합 워크플로우: export(IRI 보존) → 구조화 편집 → `apply-edits` 반영
+- [ ] merge preview의 변경 건수/내용 파싱해 반환(현재 근사치)
 
 ## 3. 테스트 / 검증
 

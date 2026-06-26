@@ -14,6 +14,7 @@
 - 전송수단 결정: 핸드롤 GWT-RPC 대신 **헤드리스 브라우저(Playwright)** — 앱 자체 JS가 CHAP·직렬화를 처리.
 - `WebProtegeClient`(`src/wp.js`) + `wp` CLI(`src/cli.js`, commander) 구현: `signup` / `login` / `projects` / `create` / `export`.
 - 라이브 인스턴스 대상 셀렉터 전부 실측 확정 (로그인·가입 폼, 프로젝트 테이블, 행 메뉴, 다운로드 포맷 다이얼로그).
+- **하이브리드 결정 + merge-upload 다리 검증**: Project ▸ Apply External Edits = 파일→프로젝트 양방향 diff(추가+삭제) 적용·새 리비전. 디컴파일+라이브 왕복으로 확인. `applyExternalEdits` 구현(`wp apply-edits`). 제약: 업로드 온톨로지 IRI가 프로젝트와 동일해야 함.
 
 ### 2. 현재 상태
 
@@ -24,17 +25,19 @@
 | projects (목록, `--json`) | ✅ 동작 |
 | create (OWL 파일로 프로젝트 생성) | ✅ 동작 |
 | export (Turtle/RDF-XML/… ZIP 다운로드) | ✅ 동작 |
+| **apply-edits** (Apply External Edits, 파일→프로젝트 merge) | ✅ 동작·검증(R2 리비전) |
 | `npm test` (e2e: create→list→export→검증) | ✅ PASS |
-| 인앱 미세 편집(클래스/프로퍼티/공리 추가) | ⬜ 미구현 |
+| 구조화 편집 엔진(owlready2: add-class/subclass/axiom + 검증·추론) | ⬜ 다음 단계 |
 | read-only raw-HTTP fast-path (`/download`) | ⬜ 미구현 |
 
 검증: `test/fixtures/tiny.owl`(Widget, Gadget⊑Widget) 업로드 → 프로젝트 생성 → Turtle export → ZIP 내 `.ttl`에 클래스/subClassOf/label 보존 확인.
 
 ### 3. 다음 할 일 (즉시)
 
-- [ ] GitHub repo 생성 여부/공개여부 사용자 확인 후 push
+- [ ] **구조화 편집 엔진** 빌드 (owlready2): `add-class` / `add-subclass` / `add-objprop` / `add-annotation` / `remove` — 각 명령이 엔티티 존재검사 + parse + 일관성 검사. (할루시네이션 방어의 본체)
+- [ ] 편집 엔진 ↔ apply-edits 연결: export(IRI 보존) → 구조화 편집 → `apply-edits`로 WebProtégé 반영. `wp edit ...` 또는 통합 워크플로우.
+- [ ] apply-edits/openProject 코드 push (현재 미커밋)
 - [ ] `wp delete`(휴지통 이동) 추가 — 테스트 정리용
-- [ ] 인앱 편집 커맨드 스파이크 (`addClass` 등) — 가치/안정성 평가
 
 ### 4. 메모
 
