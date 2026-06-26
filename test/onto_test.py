@@ -6,6 +6,7 @@ Asserts the anti-hallucination guard, add/remove deltas, IRI preservation, valid
 """
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -63,6 +64,22 @@ def main():
 
     # validate clean
     run(f, "validate")
+
+    # S2: validate --reason must not abort on a datatype outside the OWL 2 map
+    # (xsd:gYear). The reasoner needs Java; skip cleanly if it's unavailable.
+    if shutil.which("java"):
+        gy = os.path.join(d, "gy.ttl")
+        with open(gy, "w") as fh:
+            fh.write(SAMPLE + textwrap.dedent("""\
+                @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+                :born a owl:DatatypeProperty ; rdfs:range xsd:gYear .
+                :x a owl:NamedIndividual, :A ; :born "1990"^^xsd:gYear .
+            """))
+        r = run(gy, "validate", "--reason")
+        check("reason: relaxed gYear (no abort)", "relaxed" in r.stdout and "gYear" in r.stdout)
+        check("reason: ran consistency check", "consistent" in r.stdout)
+    else:
+        print("  skip  validate --reason (no java)")
 
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)

@@ -327,23 +327,84 @@ def cmd_validate(g, a):
         _reason(a.file)
 
 
+# HermiT supports only the OWL 2 datatype map; a literal typed e.g. xsd:gYear
+# makes it abort with this message (the datatype IRI is quoted in it).
+_HERMIT_UNSUPPORTED_DT = re.compile(r"datatype '([^']+)' is not part")
+
+
+def _short_dt(iri):
+    s = str(iri)
+    if s.startswith(str(XSD)):
+        return "xsd:" + s[len(str(XSD)):]
+    return s.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+
+
+def _relax_datatypes(src, relax):
+    """Copy `src`, rewriting every literal (and rdfs:range target) that uses a
+    datatype in `relax` to an opaque string, so a reasoner lacking that datatype
+    can still run. The caller's file is never touched."""
+    if not relax:
+        return src
+    relaxU = {URIRef(x) for x in relax}
+    ng = Graph()
+    for pfx, ns in src.namespaces():
+        ng.bind(pfx, ns)
+    for s, p, o in src:
+        if isinstance(o, Literal) and o.datatype in relaxU:
+            o = Literal(str(o))
+        elif isinstance(o, URIRef) and o in relaxU:
+            o = XSD.string
+        ng.add((s, p, o))
+    return ng
+
+
 def _reason(path):
-    """Run HermiT (via owlready2) for consistency / unsatisfiable classes. Best-effort."""
+    """Check consistency / unsatisfiable classes with HermiT (via owlready2).
+
+    HermiT only supports the OWL 2 datatype map, so a literal typed e.g.
+    xsd:gYear makes it abort. When that happens we relax the offending datatype
+    to an opaque string in a temp copy used *only* for reasoning and retry, so
+    class-level reasoning still runs. Best-effort: never raises. (Pellet is the
+    textbook fallback, but owlready2's bundled Pellet needs a newer JRE than this
+    environment ships — class file 69 vs 65 — so we relax instead.)"""
     try:
         import owlready2
     except Exception:
         print("reasoner: owlready2 not installed — skipped"); return
-    g = Graph(); g.parse(path)
-    tmp = tempfile.NamedTemporaryFile(suffix=".owl", delete=False).name
-    g.serialize(destination=tmp, format="xml")
-    try:
-        w = owlready2.World()
-        onto = w.get_ontology("file://" + os.path.abspath(tmp)).load()
+
+    base = Graph(); base.parse(path)
+    relaxed, seen = [], set()
+    for _ in range(16):  # bounded: one pass per distinct unsupported datatype
+        g = _relax_datatypes(base, seen)
+        tmp = tempfile.NamedTemporaryFile(suffix=".owl", delete=False).name
+        g.serialize(destination=tmp, format="xml")
         try:
+            w = owlready2.World()
+            onto = w.get_ontology("file://" + os.path.abspath(tmp)).load()
             with onto:
-                owlready2.sync_reasoner(w, debug=0)
+                owlready2.sync_reasoner_hermit(w, debug=0)
         except owlready2.OwlReadyInconsistentOntologyError:
-            print("reasoner: INCONSISTENT ontology"); return
+            _report_relaxed(relaxed)
+            print("reasoner: INCONSISTENT ontology")
+            return
+        except Exception as e:
+            m = _HERMIT_UNSUPPORTED_DT.search(str(e))
+            if m and m.group(1) not in seen:
+                seen.add(m.group(1)); relaxed.append(m.group(1))
+                continue
+            if m or "UnsupportedDatatype" in str(e):
+                dt = _short_dt(m.group(1)) if m else "an unsupported datatype"
+                print(f"reasoner: skipped — {dt} is outside the OWL 2 datatype map "
+                      f"and could not be relaxed; parse/structural checks above still apply.")
+            else:
+                print(f"reasoner: could not run ({str(e)[:160]}) — check Java is available")
+            return
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+        _report_relaxed(relaxed)
         unsat = [c.iri for c in w.inconsistent_classes()]
         if unsat:
             print(f"reasoner: {len(unsat)} unsatisfiable class(es):")
@@ -351,13 +412,15 @@ def _reason(path):
                 print(f"  ! {u}")
         else:
             print("reasoner: consistent, no unsatisfiable classes")
-    except Exception as e:
-        print(f"reasoner: could not run ({e}) — check Java is available")
-    finally:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
+        return
+    print("reasoner: skipped — too many unsupported datatypes to relax")
+
+
+def _report_relaxed(relaxed):
+    if relaxed:
+        names = ", ".join(_short_dt(x) for x in relaxed)
+        print(f"reasoner: relaxed {len(relaxed)} unsupported datatype(s) to strings "
+              f"for reasoning: {names}")
 
 
 def cmd_query(g, a):

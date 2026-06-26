@@ -1,6 +1,20 @@
 # Current Status
 
-> 최종 업데이트: 2026-06-26 (실데이터 강화 조사 — `strengthening.md`)
+> 최종 업데이트: 2026-06-26 (세션 3 — S2 reasoner 강화)
+
+---
+
+## Session 2026-06-26 (3) — S2 reasoner datatype 강화
+
+`validate --reason`가 실 PI 온톨로지의 `xsd:gYear`에서 중단되던 문제(S2) 해결 — ① 실데이터 공리 하드닝의 선행 블로커였음.
+
+- **Pellet fallback 조사 → 기각**: owlready2 0.51 번들 Pellet이 Java 25(class file 69)를 요구, 이 머신 Java 21(65) → datatype 무관하게 `UnsupportedClassVersionError`. (근거: 직접 재현)
+- **대신 datatype 자동 완화+재시도**: HermiT 중단 메시지의 datatype IRI 추출 → reasoning 임시 그래프에서만 불투명 string으로 치환 → 재시도. 사용자 파일 불변, 클래스 일관성 추론 완주, 완화 내역 명시 출력.
+- **검증**: 실 ~2000트리플(14클래스/241인스턴스) `validate --reason` → "consistent, no unsatisfiable classes"(gYear 1건 완화). 단위테스트 11/11(회귀 테스트 추가, java-guarded).
+- 환경 점검 결과: onto 엔진 OK, Java21, owlready2 0.51, 라이브 WebProtégé HTTP 200(떠 있음).
+
+### 다음
+- 이제 ① **실데이터 공리 하드닝**(`onto`로 disjointWith/inverseOf/cardinality 추가 → validate --reason → apply-edits) 가능. 또는 ② skill화. 남은 강화: S3 pre-flight IRI, S5 prune-reification, S6 state-based waits, `wp sync`/`wp delete`.
 
 ---
 

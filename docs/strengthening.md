@@ -16,7 +16,7 @@
 | # | sev | finding | status |
 |---|---|---|---|
 | S1 | **high** | WebProtégé round-trip corrupts any literal containing `@` (emails) into an invalid language-tagged literal; emails embedded in free text break the serialization structurally | **partly fixed** (sanitizer) + architectural guidance |
-| S2 | med | `validate --reason` (HermiT) aborts on datatypes outside the OWL2 map (e.g. `xsd:gYear`) | documented; fallback planned |
+| S2 | med | `validate --reason` (HermiT) aborts on datatypes outside the OWL2 map (e.g. `xsd:gYear`) | **fixed** (auto-relax unsupported datatypes + retry) |
 | S3 | med | `apply-edits` with a mismatched ontology IRI silently applies 0 changes and exits 0 | **fixed** (warns on 0 changes) |
 | S4 | low | `onto info` counted only `owl:NamedIndividual`, missing individuals declared as `a :Class` | **fixed** (reports class instances too) |
 | S5 | low | `onto remove` of an entity used as a reified statement's `rdf:subject/object` leaves an orphaned `rdf:Statement` blank node | documented |
@@ -48,13 +48,26 @@ re-imports WebProtégé's corruption. The canonical 2,064-triple file loads, val
 cleanly; only the WebProtégé export is lossy. (If you must start from an export, prefer Turtle +
 the sanitizer, and spot-check email/free-text fields.)
 
-### S2 — reasoner datatype limits
+### S2 — reasoner datatype limits — FIXED (2026-06-26 session 3)
 `onto validate --reason` shells HermiT (via owlready2). HermiT only supports the OWL2 datatype
-map and aborts on others; the real ontology uses `xsd:gYear`, so reasoning fails with
-`UnsupportedDatatypeException`. The CLI degrades gracefully (prints the reason) but gives no
-result. Plan: try Pellet as a fallback (wider datatype support), and/or surface a one-line
-"reasoner can't handle datatype X" message. `validate` (parse + structural) is unaffected and
-still useful.
+map and aborts on others; the real ontology uses `xsd:gYear`, so reasoning previously failed
+with `UnsupportedDatatypeException` and produced no result.
+
+**Pellet fallback was investigated and rejected for this environment.** owlready2 0.51 bundles
+Pellet, but its Jena dependency is compiled for a newer JRE (class file 69 = Java 25) than the
+machine ships (Java 21) — `sync_reasoner_pellet` dies with `UnsupportedClassVersionError`
+*regardless of datatype*. So Pellet can't be the fallback here without a heavier JDK upgrade.
+
+**Shipped instead — datatype relaxation + retry.** HermiT's abort message quotes the offending
+datatype IRI; `_reason` catches it, rewrites every literal/`rdfs:range` using that datatype to
+an opaque string **in a temp copy used only for reasoning** (the user's file is never touched),
+and retries. The loop adds one datatype per pass until HermiT runs (or an inconsistency / a
+non-datatype error surfaces). Class-level consistency / unsatisfiability reasoning — the part
+users actually care about — runs to completion; the relaxed datatypes are reported on a
+`reasoner: relaxed N unsupported datatype(s)…` line so nothing is hidden. Verified on the real
+~2000-triple ontology: now reports "consistent, no unsatisfiable classes" after relaxing
+`xsd:gYear`. Regression test added (`test/onto_test.py`, java-guarded). `validate` (parse +
+structural) was already unaffected.
 
 ### S3 — silent no-op on IRI mismatch (fixed)
 `apply-edits` of a file whose ontology IRI differs from the project's produced
@@ -85,7 +98,8 @@ flakiness and dead time.
 2. **Keep/extend the load sanitizer** (S1) — done for simple emails; consider a line-oriented
    recovery for embedded emails if export-based editing is ever needed.
 3. **`apply-edits` 0-change warning** (S3) — done; consider a pre-flight IRI check.
-4. **Reasoner robustness** (S2) — Pellet fallback + clearer datatype message.
+4. **Reasoner robustness** (S2) — done; auto-relax unsupported datatypes + retry (Pellet
+   fallback rejected: bundled Pellet needs Java 25, env has 21).
 5. **State-based Playwright waits** (S6) and **`onto info` instance count** (S4, done).
 6. **`remove --prune-reification`** (S5) and a **`wp sync`** wrapper for the 3-step loop.
 

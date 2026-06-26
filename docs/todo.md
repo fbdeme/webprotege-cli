@@ -37,9 +37,9 @@
 - [x] (S1) `onto` load 새니타이저: WebProtégé가 깨뜨린 `@` 이메일 리터럴 복구 (2026-06-26)
 - [x] (S3) `apply-edits` 0-change 경고(IRI 불일치 안내) (2026-06-26)
 - [x] (S4) `onto info` class-instance 카운트 추가 (2026-06-26)
-- [ ] (S1) **README에 "파일=진실원" 패턴 명문화** — WebProtégé export를 편집 베이스로 쓰지 말 것
+- [x] (S1) **README에 "파일=진실원" 패턴 명문화** — WebProtégé export를 편집 베이스로 쓰지 말 것 (2026-06-26)
 - [ ] (S1) 임베디드 이메일(자유텍스트 내) 라인지향 복구(필요 시)
-- [ ] (S2) `validate --reason` Pellet fallback + datatype 미지원 메시지 개선
+- [x] (S2) `validate --reason` 미지원 datatype 자동 완화+재시도 (Pellet은 Java25 요구로 기각) (2026-06-26)
 - [ ] (S3) `apply-edits` 업로드 전 IRI 사전 비교 체크
 - [ ] (S5) `onto remove --prune-reification`
 - [ ] (S6) Playwright 고정 대기 → 상태기반 대기(대용량/느린 인스턴스 대비)

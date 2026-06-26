@@ -173,9 +173,12 @@ plain literal `"user@dept.edu"` → WebProtégé export에서 `"user"@dept.edu`(
 
 ## Issue #9: `validate --reason`가 OWL2 외 datatype에서 중단
 
-**상태: ⏸️ 보류/문서화 (2026-06-26)** — med
+**상태: ✅ 해결됨 (2026-06-26)** — med
 
-HermiT가 `xsd:gYear` 등 OWL2 datatype map 밖 타입 거부(`UnsupportedDatatypeException`). graceful degrade는 됨. 계획: Pellet fallback + 명확한 메시지. parse/structural `validate`는 영향 없음.
+HermiT가 `xsd:gYear` 등 OWL2 datatype map 밖 타입 거부(`UnsupportedDatatypeException`).
+
+- **Pellet fallback 조사 후 기각**: owlready2 0.51 번들 Pellet(Jena)이 Java 25(class file 69)를 요구 — 이 머신은 Java 21(65). datatype과 무관하게 `UnsupportedClassVersionError`로 못 돎.
+- **대신 datatype 완화 재시도 도입**: HermiT 중단 메시지에서 문제 datatype IRI를 추출 → reasoning용 임시 그래프에서만 해당 literal/`rdfs:range`를 불투명 string으로 치환 → 재시도(미지원 타입마다 1패스). 사용자 파일 불변. 클래스 일관성/불충족 추론은 완주. 완화 내역은 `reasoner: relaxed …` 라인으로 명시. 실 ~2000트리플로 검증("consistent"). 회귀 테스트 추가(java-guarded). parse/structural `validate`는 원래 영향 없음.
 
 ## Issue #10: `apply-edits` IRI 불일치 시 조용한 무반영
 
