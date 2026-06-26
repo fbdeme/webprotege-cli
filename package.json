@@ -1,0 +1,26 @@
+{
+  "name": "webprotege-cli",
+  "version": "0.1.0",
+  "description": "Drive a self-hosted WebProtégé instance from the CLI/agents via headless-browser automation (create projects from OWL, list, export). The 2019 image has no REST API; this controls the real app.",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node test/e2e.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "wp": "src/cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "playwright": "^1.61.1"
+  }
+}

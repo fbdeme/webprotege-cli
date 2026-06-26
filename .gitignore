@@ -1,0 +1,10 @@
+node_modules/
+# session cache + downloads + debug artifacts
+*.state.json
+.wp-state.json
+wp-state.json
+/downloads/
+/debug/
+*.zip
+*.log
+.DS_Store
