@@ -27,6 +27,7 @@ Usage:
   onto remove-subclass FILE --child :Foo --parent :Bar
   onto validate    FILE [--reason]            # parse + structural checks (+ HermiT consistency)
   onto query       FILE "SPARQL..."  [--json]
+  onto diff        FILE OTHER                  # structural round-trip diff: what OTHER loses/adds vs FILE
 
 IRIs accept: full http(s) IRIs, prefixed names bound in the file (rdfs:comment, ex:Foo),
 or :Name / Name resolved against the ontology's default namespace.
@@ -37,9 +38,11 @@ import os
 import re
 import sys
 import tempfile
+from collections import Counter
 
 from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.collection import Collection
+from rdflib.compare import isomorphic
 from rdflib.namespace import OWL, RDF, RDFS, XSD
 
 # WebProtégé/OWLAPI round-trips a plain literal like "user@dept.edu" out as
@@ -112,6 +115,16 @@ def ontology_iri(g):
         if isinstance(s, URIRef):
             return s
     return None
+
+
+def reified_statements(g):
+    """Nodes using RDF reification (rdf:Statement + rdf:subject/predicate/object).
+
+    OWLAPI (and therefore WebProtégé) does NOT model RDF reification: on import it
+    keeps the node's annotations but drops rdf:subject/predicate/object, so a
+    push->export round-trip silently orphans the provenance (verified — docs/issues.md
+    #14). We surface these so the user is warned before treating an export as truth."""
+    return set(g.subjects(RDF.type, RDF.Statement)) | set(g.subjects(RDF.subject, None))
 
 
 def _ensure_default_ns(g):
@@ -218,6 +231,10 @@ def cmd_info(g, a):
     for k in ("class", "objprop", "dataprop", "annprop"):
         print(f"{k:12s} : {counts[k]}")
     print(f"individuals  : {counts['individual']} owl:NamedIndividual, {len(instances)} class instance(s)")
+    reif = reified_statements(g)
+    if reif:
+        print(f"reification  : {len(reif)} rdf:Statement node(s) "
+              f"— dropped by a WebProtégé round-trip (see issues.md #14)")
     print("prefixes     :")
     for p, n in sorted(g.namespaces()):
         print(f"  {p or '(default)'}: {n}")
@@ -395,6 +412,98 @@ def cmd_add_inverse(g, a):
           f"declared {a.prop} inverseOf {a.inverse}")
 
 
+def _split_named(g):
+    """Partition triples into (bnode-free set, bnode-bearing list).
+
+    Bnode-free triples have stable identity, so a plain set-diff is exact. Bnode-bearing
+    ones (reification, lists, restrictions) can't be paired by identity across files, so
+    we compare them by per-predicate count instead."""
+    named, bn = set(), []
+    for t in g:
+        s, _, o = t
+        (bn.append(t) if isinstance(s, BNode) or isinstance(o, BNode) else named.add(t))
+    return named, bn
+
+
+# rdf:type objects that WebProtégé/OWLAPI legitimately *materializes* on import
+# (explicit declarations) — additions of these are normalization, not corruption.
+_BENIGN_TYPES = {OWL.NamedIndividual, OWL.Class, OWL.ObjectProperty, OWL.DatatypeProperty,
+                 OWL.AnnotationProperty, RDFS.Datatype, OWL.Ontology}
+_SPO = (RDF.subject, RDF.predicate, RDF.object)
+
+
+def cmd_diff(g, a):
+    """Structural round-trip differential — what does B lose / add vs A.
+
+    The WebProtégé boundary is lossy by design (RDF<->OWL is not 1:1) and the losses are
+    SILENT: the export still parses and the counts look healthy. The only way they can't
+    hide is a differential. Use `onto diff <canonical> <export>` after a round-trip (or to
+    check any two ontology files agree). Exit 1 if any A assertion is missing from B.
+
+    Method: bnode-free triples are diffed exactly; bnode-bearing structures (reification,
+    lists, restrictions) are compared by per-predicate count (a dropped count = structural
+    loss) plus an explicit RDF-reification check (issue #14)."""
+    A = g                       # already loaded from a.file
+    B = load(a.other)
+    print(f"A: {a.file}  ({len(A)} triples)")
+    print(f"B: {a.other}  ({len(B)} triples)")
+    if isomorphic(A, B):
+        print("\nverdict: IDENTICAL — A and B are isomorphic (no loss, no additions).")
+        return
+
+    NA, bnA = _split_named(A)
+    NB, bnB = _split_named(B)
+    lost, added = NA - NB, NB - NA
+
+    print("\nnamed (bnode-free) triples:")
+    print(f"  lost  (in A, not B): {len(lost)}")
+    print(f"  added (in B, not A): {len(added)}")
+    if lost:
+        print("  LOST by predicate:")
+        for p, n in Counter(p for _, p, _ in lost).most_common():
+            print(f"    {n:4d}  {short(A, p)}")
+        for t in list(lost)[:8]:
+            print("      e.g. " + "  ".join(short(A, x) for x in t))
+    if added:
+        tb = Counter(o for _, p, o in added if p == RDF.type)
+        benign = sum(n for o, n in tb.items() if o in _BENIGN_TYPES)
+        print(f"  added breakdown: {benign} benign type declaration(s) "
+              f"(NamedIndividual/Class/Datatype/...), {len(added) - benign} other")
+
+    cA, cB = Counter(p for _, p, _ in bnA), Counter(p for _, p, _ in bnB)
+    drops = {p: (cA[p], cB.get(p, 0)) for p in cA if cA[p] > cB.get(p, 0)}
+    print("\nblank-node structures (reification / lists / restrictions):")
+    print(f"  bnode-bearing triples: A={len(bnA)}  B={len(bnB)}")
+    if drops:
+        print("  predicate counts that DROPPED A->B (structural loss signal):")
+        for p, (na, nb) in sorted(drops.items(), key=lambda kv: kv[1][1] - kv[1][0]):
+            print(f"    {short(A, p):42s} {na:4d} -> {nb}")
+
+    reifA, reifB = reified_statements(A), reified_statements(B)
+    spoA = sum(len(list(A.triples((None, q, None)))) for q in _SPO)
+    spoB = sum(len(list(B.triples((None, q, None)))) for q in _SPO)
+    reif_loss = bool(reifA) and spoB < spoA
+    if reifA or reifB:
+        msg = ("  <-- DROPPED: provenance orphaned (issue #14)" if reif_loss else "")
+        print(f"  reification: rdf:Statement nodes A={len(reifA)} B={len(reifB)}; "
+              f"s/p/o link triples A={spoA} B={spoB}{msg}")
+
+    lost_bn = sum(na - nb for na, nb in drops.values())
+    print()
+    if lost or drops:
+        parts = []
+        if lost:
+            parts.append(f"{len(lost)} named triple(s)")
+        if drops:
+            parts.append(f"{lost_bn} bnode-structure triple(s)")
+        print("verdict: LOSS DETECTED — " + " + ".join(parts) + " in A are missing from B.")
+        if reif_loss:
+            print("  this includes RDF reification (provenance links) — see docs/issues.md #14.")
+        sys.exit(1)
+    extra = f" (B adds {len(added)} triple(s), all normalization)" if added else ""
+    print(f"verdict: NO LOSS — every A assertion is present in B{extra}.")
+
+
 def cmd_validate(g, a):
     problems = []
     classes = set(g.subjects(RDF.type, OWL.Class))
@@ -414,6 +523,14 @@ def cmd_validate(g, a):
             print(f"  ! {p}")
     else:
         print("structural: OK")
+    reif = reified_statements(g)
+    if reif:
+        print(f"round-trip warning: {len(reif)} RDF-reified statement(s) "
+              "(rdf:subject/predicate/object)")
+        print("  WebProtégé/OWLAPI does not model RDF reification — `wp apply-edits` then")
+        print("  `wp export` will silently DROP the subject/predicate/object links and orphan")
+        print("  their annotations. Keep the canonical file as the source of truth; push to")
+        print("  WebProtégé for viewing only, never edit a fresh export (see issues.md #14).")
     if a.reason:
         _reason(a.file)
 
@@ -596,6 +713,9 @@ def build_parser():
 
     s = sub.add_parser("query"); s.add_argument("file"); s.add_argument("sparql")
     s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_query, out=None, lang=None)
+
+    s = sub.add_parser("diff"); s.add_argument("file"); s.add_argument("other")
+    s.set_defaults(fn=cmd_diff, out=None, lang=None)
     return p
 
 

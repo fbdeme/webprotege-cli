@@ -8,7 +8,15 @@
 
 **필드테스트 (throwaway 계정 `wpcli_h135555`, 미커밋 — study_abroad 불변)**: 실 PI 온톨로지(`pi-ontology.owl`, 2064트리플)로 `wp create "cli test"` → `projects` → `export` 전 과정 동작 확인. 업로드 충실도 = ObjectProperty 16/16·DatatypeProperty 14/14 일치, Class 14→15(owl:Thing 정규화), 개체 241→242 보존.
 
-**발견 → 해결 (CLI 작업, 이 repo)**: 재export를 `onto info`로 읽을 때 S1(이메일 `@` 망가짐)이 라이브 재현 + **임베디드 케이스**가 새 발견 — 이메일이 텍스트 중간에 박히면 가짜 lang-tag 뒤 원문(`, NPGS 무본드).`)이 따옴표 밖에 남아 파싱 차단(line 3113). 새니타이저 정규식을 EOL 종결자까지 trailing 원문을 끌어들이도록 확장 → 실 export에서 40/40 복구(잔여 0), 임베디드 값 원문 그대로 재구성. 테스트 24→**29 통과**. issues #8 ✅ 해결.
+**발견 → 해결 ① (CLI 작업, 이 repo)**: 재export를 `onto info`로 읽을 때 S1(이메일 `@` 망가짐)이 라이브 재현 + **임베디드 케이스**가 새 발견 — 이메일이 텍스트 중간에 박히면 가짜 lang-tag 뒤 원문(`, NPGS 무본드).`)이 따옴표 밖에 남아 파싱 차단(line 3113). 새니타이저 정규식을 EOL 종결자까지 trailing 원문을 끌어들이도록 확장 → 실 export에서 40/40 복구(잔여 0), 임베디드 값 원문 그대로 재구성. issues #8 ✅ 해결.
+
+**발견 → 가드 ② (라운드트립 무결성 감사, set-diff)**: 원본(2064) vs 재export(2233) rdflib 트리플 set-diff — **명명 트리플 손실 0**(추가 247=전부 benign type 선언), **그러나 `rdf:subject/predicate/object` 26→0**: WebProtégé가 **RDF reification(provenance)을 silent하게 버림**(78트리플, 어노테이션 고아화). OWLAPI가 RDF reification을 OWL로 모델링 안 함(=WebProtégé 한계, CLI 버그 아님). happy-path 카운트·파싱 다 정상이라 bnode set-diff로만 드러남 — S1보다 음험. → `onto info`/`validate`에 reification 감지 경고 가드(에러 아님). 가이드 강화(캐노니컬=진실원, WebProtégé=view-only). issues **#14** + strengthening **S7**.
+
+**근본 대응 ③ (shipped, CLI 작업)**: 경계는 본질적으로 lossy → 패치보다 **"손실을 못 보고 지나치지 않게"**. **`onto diff <A> <B>` 구조 라운드트립 diff 명령 추가** — set-diff 감사를 정식 도구로 승격. bnode-free 트리플 정확 diff + bnode 구조 predicate별 카운트 + reification 명시 체크, **A 단언이 B에 없으면 exit 1**. 검증: 동일=`IDENTICAL`(0), 원본 vs 재export=reification 78트리플 손실(exit 1). 이메일 sanitizer 누락도 자동 포착 → *알려지지 않은* 손실까지 가드. (rdflib `isomorphic`로 동일성 헤드라인.)
+
+**근본 대응 후보(다음)**: ① provenance를 `owl:Axiom`로 인코딩(라운드트립 생존), ② `validate --profile owlapi-safe`, ③ `wp` push 후 자동 `onto diff`(post-push verify).
+
+**테스트**: 24→**38 통과**(이메일 임베디드 + reification 경고 + onto diff 회귀 추가).
 
 ---
 

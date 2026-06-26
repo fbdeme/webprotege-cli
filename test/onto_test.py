@@ -105,6 +105,39 @@ def main():
     check("simple email rejoined", "ping alice@dept.edu" in r.stdout)
     check("embedded email + trailing rejoined", "bob-x@e.ntu.edu.sg, NPGS ok)." in r.stdout)
 
+    # Issue #14 regression: OWLAPI/WebProtégé drops RDF reification on a round-trip,
+    # silently orphaning the provenance. validate/info must WARN (not fail) when present.
+    rf = os.path.join(d, "reif.ttl")
+    with open(rf, "w") as fh:
+        fh.write(SAMPLE + textwrap.dedent("""\
+            [ a rdf:Statement ;
+              rdf:subject :B ; rdf:predicate rdfs:subClassOf ; rdf:object :A ;
+              rdfs:comment "provenance note" ] .
+        """))
+    r = run(rf, "validate")  # reification must warn but NOT fail (exit 0)
+    check("reification round-trip warning", "round-trip warning" in r.stdout and "#14" in r.stdout)
+    r = run(rf, "info")
+    check("info reports reification", "reification" in r.stdout)
+
+    # onto diff: the round-trip differential guard. Identical -> exit 0; any A assertion
+    # missing from B (named or reification s/p/o) -> LOSS DETECTED, exit 1.
+    da = os.path.join(d, "da.ttl")
+    db = os.path.join(d, "db.ttl")
+    with open(da, "w") as fh:
+        fh.write(SAMPLE + textwrap.dedent("""\
+            :X a owl:Class .
+            [ a rdf:Statement ; rdf:subject :X ; rdf:predicate rdfs:label ;
+              rdf:object "x" ; rdfs:comment "prov" ] .
+        """))
+    # B = WebProtégé-style lossy copy: :X dropped + reification s/p/o stripped
+    with open(db, "w") as fh:
+        fh.write(SAMPLE + '[ a rdf:Statement ; rdfs:comment "prov" ] .\n')
+    r = run(da, "diff", da)  # identical -> exit 0
+    check("diff identical", "IDENTICAL" in r.stdout)
+    r = run(da, "diff", db, expect=1)  # loss -> exit 1
+    check("diff detects loss", "LOSS DETECTED" in r.stdout)
+    check("diff flags reification loss", "#14" in r.stdout)
+
     # S2: validate --reason must not abort on a datatype outside the OWL 2 map
     # (xsd:gYear). The reasoner needs Java; skip cleanly if it's unavailable.
     if shutil.which("java"):

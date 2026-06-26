@@ -109,9 +109,28 @@ wp apply-edits my-ontology -f "$F" -m "add Pump + drives"
 
 `onto` commands: `info`, `add-class`, `add-subclass`, `add-objprop`, `add-dataprop`,
 `add-individual`, `add-annotation`, `add-disjoint`, `add-characteristic`, `add-inverse`,
-`remove`, `remove-subclass`, `validate [--reason]`, `query "<SPARQL>"`. IRIs accept full
-`http(s)://…`, prefixed names bound in the file (`rdfs:comment`, `ex:Foo`), or `:Name`/`Name`
+`remove`, `remove-subclass`, `validate [--reason]`, `query "<SPARQL>"`, `diff <other>`. IRIs accept
+full `http(s)://…`, prefixed names bound in the file (`rdfs:comment`, `ex:Foo`), or `:Name`/`Name`
 against the default namespace.
+
+### Verifying a round-trip (`onto diff`)
+
+The WebProtégé boundary is **lossy by design** (RDF↔OWL isn't 1:1) and the losses are *silent* —
+the export still parses and the counts look healthy. `onto diff` makes them impossible to miss: it
+structurally compares two ontology files and **exits non-zero if any assertion in the first is
+missing from the second**.
+
+```bash
+# round-trip a project and verify nothing was dropped
+wp export my-kb -F Turtle -o rt.zip && unzip -o rt.zip -d rt
+onto diff canonical.ttl "$(find rt -name '*.ttl')"   # exit 1 + report if WebProtégé lost anything
+```
+
+It diffs bnode-free triples exactly, compares blank-node structures (reification, lists,
+restrictions) by per-predicate count, and explicitly flags dropped RDF reification. Two known-lossy
+cases it catches automatically: `@`-literal mangling (if the sanitizer ever misses one) and
+**RDF reification** — WebProtégé/OWLAPI silently drops `rdf:subject/predicate/object`, orphaning
+provenance (`docs/issues.md` #14). `onto info`/`validate` also warn when a file contains reification.
 
 Axiom hardening (disjointness, property characteristics) goes through the same checked path:
 

@@ -219,3 +219,29 @@ HermiT가 `xsd:gYear` 등 OWL2 datatype map 밖 타입 거부(`UnsupportedDataty
 - export 결과에 `owl:AllDisjointClasses` + `owl:members ( :Cat :Dog … )`, `owl:FunctionalProperty`, `owl:SymmetricProperty` 모두 보존.
 
 → 공리 하드닝 명령은 push 경로(file→WebProtégé)에서 안전. (오프라인에선 HermiT가 disjoint/functional 위반을 INCONSISTENT로 잡는 것도 실데이터로 확인.)
+
+## Issue #14: WebProtégé 라운드트립이 RDF reification(provenance)을 조용히 버림
+
+**상태: ✅ 문서화 + 가드 (2026-06-26)** — high
+
+### 문제 (라이브 필드테스트 `cli test`에서 set-diff로 발견)
+
+실 PI 온톨로지를 `wp create`로 올린 뒤 재export → rdflib **트리플 단위 set-diff** 결과:
+- bnode-free 트리플 **손실 0** — 명명 트리플은 전부 생존, 추가 247개는 전부 benign type 선언(NamedIndividual 242 + Datatype 3 + AnnotationProperty 1 + Class 1).
+- **그러나** reification 구역: `rdf:subject`/`rdf:predicate`/`rdf:object`가 **src 26 → exp 0**(export 파일 grep으로도 0 확인). 26 reified statement × 3 = **78트리플 silent 손실**.
+- 원본 노드: `rdf:Statement` + s/p/o + asOf/source/verified/note. export 노드: asOf/source/verified/note만 남고 **s/p/o 통째로 없음** → provenance가 *어떤 사실*에 대한 건지 모르는 **고아 노드**가 됨.
+
+### 원인
+
+OWLAPI(WebProtégé 내부)는 **RDF reification을 OWL 구문으로 모델링하지 않음**. 업로드 파싱 시 `rdf:Statement` 노드의 어노테이션은 익명 개체로 보존하되 s/p/o 포인터는 비-OWL이라 폐기. (OWL 2의 정식 축-어노테이션은 `owl:Axiom`+`owl:annotatedSource/Property/Target` — 원본은 이게 아니라 `rdf:Statement`라 살아남지 못함.) **WebProtégé 한계이지 CLI 버그 아님.**
+
+### 특징 — 왜 위험한가
+
+happy-path 카운트(클래스/속성/개체)는 멀쩡, export는 **파싱 에러도 없이** 깨끗하게 열림. bnode 레벨 set-diff를 해야만 드러나는 **silent** 손실. (S1 이메일 망가짐보다 더 음험함.)
+
+### 해결 방법
+
+- (shipped) `onto` 가드: `reified_statements()`로 `rdf:Statement`/`rdf:subject` 노드 감지 → `info`에 `reification: N node(s) — dropped by a WebProtégé round-trip` 라인, `validate`에 `round-trip warning`(에러 아님, exit 0) 출력. 회귀 테스트 추가.
+- (guidance, 강화) **캐노니컬 파일=진실원, WebProtégé는 view-only(push만)**. export를 편집 베이스로 쓰면 provenance가 소실됨. → `strengthening.md` S1 가이드에 reification 케이스 추가.
+- (shipped, 근본 대응) **`onto diff <A> <B>` 구조 라운드트립 diff** — 이 set-diff 감사를 정식 명령으로 승격. bnode-free 트리플은 정확 diff, bnode 구조(reification/list/restriction)는 predicate별 카운트 비교 + reification 명시 체크. **A의 단언이 B에 없으면 exit 1**. 실데이터 검증: 동일 파일=`IDENTICAL`(exit 0), 원본 vs 재export=reification 78트리플 손실 탐지(exit 1). 이메일 sanitizer가 놓친 케이스도 자동 포착(생존 보장 강화). 회귀 테스트 추가(38/38). → 경계는 lossy해도 **손실이 들키지 않고 지나가지 못함**.
+- (향후 후보) ① provenance를 `owl:Axiom` 어노테이션으로 인코딩하면 라운드트립 생존(검증 필요). ② `onto validate --profile owlapi-safe`로 비보존 구문 사전 차단. ③ `wp` push 후 자동 `onto diff` 검증(post-push verify).
