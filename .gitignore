@@ -8,3 +8,5 @@ wp-state.json
 *.zip
 *.log
 .DS_Store
+.venv/
+__pycache__/

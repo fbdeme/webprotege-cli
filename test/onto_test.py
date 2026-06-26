@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Offline smoke test for onto.py (no live WebProtégé needed).
+
+Run with the project venv:  .venv/bin/python test/onto_test.py
+Asserts the anti-hallucination guard, add/remove deltas, IRI preservation, validate.
+"""
+import os
+import pathlib
+import subprocess
+import sys
+import tempfile
+import textwrap
+
+ONTO = pathlib.Path(__file__).resolve().parent.parent / "onto.py"
+PY = sys.executable
+SAMPLE = textwrap.dedent("""\
+    @prefix : <http://example.org/t#> .
+    @prefix owl: <http://www.w3.org/2002/07/owl#> .
+    @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+    <http://example.org/t> a owl:Ontology .
+    :A a owl:Class .
+    :B a owl:Class ; rdfs:subClassOf :A .
+""")
+
+passed = failed = 0
+
+
+def check(label, cond):
+    global passed, failed
+    print(("  ok   " if cond else "  FAIL ") + label)
+    passed += cond
+    failed += not cond
+
+
+def run(f, *args, expect=0):
+    r = subprocess.run([PY, str(ONTO), args[0], f, *args[1:]], capture_output=True, text=True)
+    check(f"exit {r.returncode}=={expect}: {' '.join(args)}", r.returncode == expect)
+    return r
+
+
+def main():
+    d = tempfile.mkdtemp()
+    f = os.path.join(d, "t.ttl")
+    with open(f, "w") as fh:
+        fh.write(SAMPLE)
+
+    # anti-hallucination: referencing a non-existent parent must be refused, file untouched
+    run(f, "add-subclass", "--child", ":B", "--parent", ":Ghost", expect=1)
+    check("Ghost not written", "Ghost" not in open(f).read())
+
+    # add a class under an existing parent
+    run(f, "add-class", "--iri", ":C", "--label", "Cee", "--parent", ":A")
+    body = open(f).read()
+    check(":C added", ":C" in body and "subClassOf :A" in body)
+
+    # ontology IRI preserved
+    check("IRI preserved", "<http://example.org/t>" in body and "owl:Ontology" in body)
+
+    # remove it again ("Cee" is the unique label; avoid ":C" which is a substring of "owl:Class")
+    run(f, "remove", "--iri", ":C")
+    check(":C removed", "Cee" not in open(f).read() and ":C " not in open(f).read())
+
+    # validate clean
+    run(f, "validate")
+
+    print(f"\n{passed} passed, {failed} failed")
+    sys.exit(1 if failed else 0)
+
+
+if __name__ == "__main__":
+    main()

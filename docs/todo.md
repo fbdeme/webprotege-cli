@@ -21,14 +21,16 @@
 - [ ] `delete` — 프로젝트 휴지통 이동 (테스트 정리·관리용)
 - [ ] `export --unzip` — ZIP 자동 해제해 단일 파일 저장
 
-## 2b. 하이브리드 편집 (다음 단계)
+## 2b. 하이브리드 편집
 
-- [ ] 구조화 편집 엔진(owlready2/rdflib): `add-class`/`add-subclass`/`add-objprop`/`add-annotation`/`remove`
-  - [ ] 각 명령 = 엔티티 존재검사 + delta 적용 + parse 검증
-  - [ ] `validate` = 일관성/추론 검사(HermiT)
-  - [ ] Ontology IRI 보존(apply-edits 전제) 보장
-- [ ] 통합 워크플로우: export(IRI 보존) → 구조화 편집 → `apply-edits` 반영
-- [ ] merge preview의 변경 건수/내용 파싱해 반환(현재 근사치)
+- [x] 구조화 편집 엔진 `onto.py`(rdflib): `add-class`/`add-subclass`/`add-objprop`/`add-dataprop`/`add-individual`/`add-annotation`/`remove`/`remove-subclass`/`info`/`query` (2026-06-26)
+  - [x] 각 명령 = 엔티티 존재검사(없으면 거부) + delta 적용 + parse 가드 (2026-06-26)
+  - [x] `validate --reason` = HermiT 일관성/불충족 클래스 검사(owlready2) (2026-06-26)
+  - [x] Ontology IRI 보존 — save 시 변경되면 abort (2026-06-26)
+  - [x] 단위테스트 `test/onto_test.py` 8/8 (2026-06-26)
+- [x] 통합 워크플로우 라이브 실증: export(IRI 보존) → `onto` 편집 → `wp apply-edits` 반영 (2026-06-26)
+- [ ] (선택) `wp sync` 단일 래퍼로 3스텝 자동화
+- [ ] merge preview의 변경 건수/내용 정밀 파싱(현재 근사치)
 
 ## 3. 테스트 / 검증
 

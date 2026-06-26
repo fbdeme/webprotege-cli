@@ -15,6 +15,8 @@
 - `WebProtegeClient`(`src/wp.js`) + `wp` CLI(`src/cli.js`, commander) 구현: `signup` / `login` / `projects` / `create` / `export`.
 - 라이브 인스턴스 대상 셀렉터 전부 실측 확정 (로그인·가입 폼, 프로젝트 테이블, 행 메뉴, 다운로드 포맷 다이얼로그).
 - **하이브리드 결정 + merge-upload 다리 검증**: Project ▸ Apply External Edits = 파일→프로젝트 양방향 diff(추가+삭제) 적용·새 리비전. 디컴파일+라이브 왕복으로 확인. `applyExternalEdits` 구현(`wp apply-edits`). 제약: 업로드 온톨로지 IRI가 프로젝트와 동일해야 함.
+- **구조화 편집 엔진 `onto.py`(Python/rdflib+owlready2) 빌드**: add-class/subclass/objprop/dataprop/individual/annotation/remove/validate(--reason HermiT)/query. 존재하지 않는 엔티티 참조 거부(안티-할루시네이션), Ontology IRI 보존, delta 출력. 단위테스트 8/8.
+- **전체 하이브리드 루프 라이브 실증**: create→export(IRI 보존)→`onto` 편집(:Ghost 거부 + Cog 추가 + 추론 일관성)→`wp apply-edits`→재export에서 반영 확인.
 
 ### 2. 현재 상태
 
@@ -26,18 +28,19 @@
 | create (OWL 파일로 프로젝트 생성) | ✅ 동작 |
 | export (Turtle/RDF-XML/… ZIP 다운로드) | ✅ 동작 |
 | **apply-edits** (Apply External Edits, 파일→프로젝트 merge) | ✅ 동작·검증(R2 리비전) |
-| `npm test` (e2e: create→list→export→검증) | ✅ PASS |
-| 구조화 편집 엔진(owlready2: add-class/subclass/axiom + 검증·추론) | ⬜ 다음 단계 |
-| read-only raw-HTTP fast-path (`/download`) | ⬜ 미구현 |
+| **`onto` 구조화 편집 엔진**(add-*/remove/validate --reason/query) | ✅ 동작·검증(8/8) |
+| **하이브리드 루프** (export→onto→apply-edits) | ✅ 라이브 실증 |
+| `npm test` (e2e) / `onto_test.py` | ✅ PASS / 8 passed |
+| read-only raw-HTTP fast-path (`/download`) | ⬜ 미구현(선택) |
 
 검증: `test/fixtures/tiny.owl`(Widget, Gadget⊑Widget) 업로드 → 프로젝트 생성 → Turtle export → ZIP 내 `.ttl`에 클래스/subClassOf/label 보존 확인.
 
 ### 3. 다음 할 일 (즉시)
 
-- [ ] **구조화 편집 엔진** 빌드 (owlready2): `add-class` / `add-subclass` / `add-objprop` / `add-annotation` / `remove` — 각 명령이 엔티티 존재검사 + parse + 일관성 검사. (할루시네이션 방어의 본체)
-- [ ] 편집 엔진 ↔ apply-edits 연결: export(IRI 보존) → 구조화 편집 → `apply-edits`로 WebProtégé 반영. `wp edit ...` 또는 통합 워크플로우.
-- [ ] apply-edits/openProject 코드 push (현재 미커밋)
+- [ ] (선택) `wp sync` 단일 래퍼: export→unzip→[편집]→apply-edits 자동화 (현재는 수동 3스텝, README에 문서화됨)
 - [ ] `wp delete`(휴지통 이동) 추가 — 테스트 정리용
+- [ ] `onto` IRI-변경 가드 강화 / merge preview 변경건수 정밀 파싱
+- [ ] (선택) `onto`를 pi_research/instances.ttl 실제 편집에 적용
 
 ### 4. 메모
 
