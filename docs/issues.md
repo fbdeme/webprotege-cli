@@ -160,16 +160,22 @@ merge-upload(파일→프로젝트 반영)가 어떤 경우 아무 변경도 적
 
 ## Issue #8: WebProtégé 라운드트립이 `@` 리터럴(이메일)을 깨뜨림
 
-**상태: 🔄 부분해결 (2026-06-26)** — high
+**상태: ✅ 해결됨 (2026-06-26)** — high
 
 ### 문제/원인
 
-plain literal `"user@dept.edu"` → WebProtégé export에서 `"user"@dept.edu`(도메인=언어태그). 점 든 lang tag는 Turtle/RDF 위반 → rdflib 거부. Turtle뿐 아니라 RDF/XML(`xml:lang`)도 동일 → **저장값 자체 손상**. 자유 텍스트에 박힌 이메일은 뒤 텍스트가 dangling되어 구조 파손. 실데이터에서 ~40건.
+plain literal `"user@dept.edu"` → WebProtégé export에서 `"user"@dept.edu`(도메인=언어태그). 점 든 lang tag는 Turtle/RDF 위반 → rdflib 거부. Turtle뿐 아니라 RDF/XML(`xml:lang`)도 동일 → **저장값 자체 손상**. 실데이터(`cli test` export)에서 40건(39 단순 + 1 임베디드).
+
+**임베디드 케이스(라이브 필드테스트 `cli test`에서 발견, 2026-06-26)**: 이메일이 자유 텍스트 *중간에* 박히면 가짜 lang-tag 뒤에 원문이 더 이어짐:
+```
+:note "MMLab 2026/27 모집(중앙접수 mmlab-contact"@e.ntu.edu.sg, NPGS 무본드). ;
+```
+초기 새니타이저는 도메인(`e.ntu.edu.sg`)까지만 재결합해 `, NPGS 무본드).` 가 따옴표 밖에 남음 → `,` 가 Turtle objectList 구분자로 오인 → `Bad syntax (objectList expected)`. 단순 이메일 40건은 복구됐으나 이 1건이 파싱 차단.
 
 ### 해결 방법
 
-- (shipped) `onto` load 새니타이저: `"…"@<점든태그>` → 따옴표 안으로 재결합(단순 이메일 40/40 복구). 임베디드 케이스는 불완전.
-- (guidance) **캐노니컬 파일을 진실원으로** — WebProtégé export를 편집 베이스로 쓰지 말 것. 편집은 파일에서 `onto`, 반영은 `apply-edits`로 push만.
+- (shipped) `onto` load 새니타이저: `"…"@<점든태그>` → 따옴표 안으로 재결합. **정규식을 EOL 종결자(`;`/`.`/`,`)까지 trailing 원문을 끌어들이도록 확장** → 단순/임베디드 양쪽 복구. 실 export(`cli test`)에서 40/40 복구(잔여 0), `onto info` 클린 파싱 + 임베디드 값 원문 그대로 재구성 확인(`"…mmlab-contact@e.ntu.edu.sg, NPGS 무본드)."`). 회귀 테스트 추가.
+- (guidance) **캐노니컬 파일을 진실원으로** — WebProtégé export를 편집 베이스로 쓰지 말 것. 편집은 파일에서 `onto`, 반영은 `apply-edits`로 push만. (새니타이저는 안전망이지 정식 경로가 아님.)
 
 ## Issue #9: `validate --reason`가 OWL2 외 datatype에서 중단
 

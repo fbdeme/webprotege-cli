@@ -1,6 +1,14 @@
 # Current Status
 
-> 최종 업데이트: 2026-06-26 (세션 3 — S2 reasoner + 공리 하드닝 명령)
+> 최종 업데이트: 2026-06-26 (세션 3c — end-to-end 필드테스트 + S1 임베디드 이메일 해결)
+
+---
+
+## Session 2026-06-26 (3c) — 실 PI 온톨로지 end-to-end 필드테스트 + 새니타이저 임베디드 케이스 해결
+
+**필드테스트 (throwaway 계정 `wpcli_h135555`, 미커밋 — study_abroad 불변)**: 실 PI 온톨로지(`pi-ontology.owl`, 2064트리플)로 `wp create "cli test"` → `projects` → `export` 전 과정 동작 확인. 업로드 충실도 = ObjectProperty 16/16·DatatypeProperty 14/14 일치, Class 14→15(owl:Thing 정규화), 개체 241→242 보존.
+
+**발견 → 해결 (CLI 작업, 이 repo)**: 재export를 `onto info`로 읽을 때 S1(이메일 `@` 망가짐)이 라이브 재현 + **임베디드 케이스**가 새 발견 — 이메일이 텍스트 중간에 박히면 가짜 lang-tag 뒤 원문(`, NPGS 무본드).`)이 따옴표 밖에 남아 파싱 차단(line 3113). 새니타이저 정규식을 EOL 종결자까지 trailing 원문을 끌어들이도록 확장 → 실 export에서 40/40 복구(잔여 0), 임베디드 값 원문 그대로 재구성. 테스트 24→**29 통과**. issues #8 ✅ 해결.
 
 ---
 

@@ -47,11 +47,25 @@ from rdflib.namespace import OWL, RDF, RDFS, XSD
 # language tag can never contain a '.', so this is invalid Turtle/RDF and rdflib
 # (correctly) refuses to load it. Any "..."@<tag-with-a-dot> is therefore an
 # unambiguously mangled literal; re-join it into the quoted string.
-_MANGLED_LANGTAG = re.compile(r'"((?:[^"\\]|\\.)*)"@([A-Za-z0-9-]+(?:\.[A-Za-z0-9.-]+))')
+#
+# Two shapes occur in real exports:
+#   1. the email is the whole value     -> ... "user"@dept.edu ;
+#   2. the email is *embedded* in text  -> ... "...contact"@e.ntu.edu.sg, NPGS 무본드). ;
+# In (2) the original text continues past the bogus tag, so we must also pull that
+# trailing run (up to the statement terminator at end-of-line) back inside the quotes,
+# otherwise the stray ", NPGS ..." reads as a Turtle objectList and parsing dies.
+# group 3 captures that trailing run (empty for shape 1); the terminator stays outside.
+_MANGLED_LANGTAG = re.compile(
+    r'"((?:[^"\\]|\\.)*)"'                    # 1: literal body up to the spurious close-quote
+    r'@([A-Za-z0-9-]+(?:\.[A-Za-z0-9.-]+))'   # 2: the bogus "language tag" (a dotted domain)
+    r'([^"\n]*?)'                             # 3: any trailing original text on the same line
+    r'(?=[ \t]*[;,.]?[ \t]*$)',              # ...stopping at the statement terminator / EOL
+    re.MULTILINE,
+)
 
 
 def _sanitize_turtle(text):
-    return _MANGLED_LANGTAG.subn(r'"\1@\2"', text)
+    return _MANGLED_LANGTAG.subn(r'"\1@\2\3"', text)
 
 KIND_TYPE = {
     "class": OWL.Class,

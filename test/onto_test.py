@@ -80,6 +80,31 @@ def main():
     # validate clean
     run(f, "validate")
 
+    # Issue #8 regression: WebProtégé export mangles "@"-bearing literals into bogus
+    # language tags ("user@dept.edu" -> "user"@dept.edu). The load sanitizer must repair
+    # BOTH the simple case AND the embedded case, where the original text continues past
+    # the bogus tag ("...bob-x"@e.ntu.edu.sg, NPGS ok).) — that trailing run must be pulled
+    # back inside the quotes or the stray ", NPGS ..." parses as a Turtle objectList and dies.
+    mf = os.path.join(d, "mangled.ttl")
+    with open(mf, "w") as fh:
+        fh.write(textwrap.dedent("""\
+            @prefix : <http://example.org/t#> .
+            @prefix owl: <http://www.w3.org/2002/07/owl#> .
+            @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+            @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+            <http://example.org/t> a owl:Ontology .
+            :A a owl:Class .
+            :note a owl:AnnotationProperty .
+            :i a owl:NamedIndividual, :A ;
+               :note "ping alice"@dept.edu ;
+               :note "MMLab recruiting bob-x"@e.ntu.edu.sg, NPGS ok). .
+        """))
+    r = run(mf, "info")  # must parse (exit 0) despite both mangled shapes
+    check("sanitizer repaired both mangled literals", "repaired 2" in r.stderr)
+    r = run(mf, "query", "SELECT ?n WHERE { ?s <http://example.org/t#note> ?n }")
+    check("simple email rejoined", "ping alice@dept.edu" in r.stdout)
+    check("embedded email + trailing rejoined", "bob-x@e.ntu.edu.sg, NPGS ok)." in r.stdout)
+
     # S2: validate --reason must not abort on a datatype outside the OWL 2 map
     # (xsd:gYear). The reasoner needs Java; skip cleanly if it's unavailable.
     if shutil.which("java"):

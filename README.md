@@ -103,8 +103,9 @@ wp apply-edits my-ontology -f "$F" -m "add Pump + drives"
 > already control (e.g. in git) and using `apply-edits` to *push* to WebProtégé for viewing.
 > Round-tripping *through* WebProtégé is lossy: its export mangles any literal containing `@`
 > (emails become invalid language-tagged literals), so building edits on a fresh `wp export` can
-> corrupt those values. `onto` repairs the simple case on load, but the canonical-file route
-> avoids the problem entirely. See [`docs/strengthening.md`](docs/strengthening.md).
+> corrupt those values. `onto`'s load sanitizer repairs these on the way in (both bare emails and
+> emails embedded mid-text), but the canonical-file route avoids the problem entirely. See
+> [`docs/strengthening.md`](docs/strengthening.md).
 
 `onto` commands: `info`, `add-class`, `add-subclass`, `add-objprop`, `add-dataprop`,
 `add-individual`, `add-annotation`, `add-disjoint`, `add-characteristic`, `add-inverse`,
