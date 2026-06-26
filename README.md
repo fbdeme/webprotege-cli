@@ -6,6 +6,10 @@ export them — without clicking through the web UI.
 
 > Companion to the [`webprotege-selfhost`](https://github.com/fbdeme/webprotege-selfhost)
 > runbook, which stands up the instance this CLI talks to.
+>
+> Packaged as a Claude Code skill at
+> [`webprotege-cli-skill`](https://github.com/fbdeme/webprotege-cli-skill) so agents can drive
+> this tool directly.
 
 ## Why a browser, not HTTP?
 
