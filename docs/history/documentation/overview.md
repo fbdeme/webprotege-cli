@@ -1,0 +1,6 @@
+- 2026-06-26 "조종형" CLI로 결정: 파일만 다루는 방식이 아니라 앱을 실제로 제어 — 사용자가 WebProtégé 기능 자체(프로젝트 생성·목록·내보내기·협업)를 에이전트로 쓰기를 원함
+- 2026-06-26 전송 수단을 헤드리스 브라우저(Playwright)로 결정, 직접 구현한 GWT-RPC 기각 — 직렬화기를 액션마다 구현해야 하는 비용, 이미지 고정으로 DOM 변화 위험 제거, `references/control-surface.md`
+- 2026-06-26 온톨로지 편집은 파일 수준(rdflib/owlready2), WebProtégé 조종은 프로젝트 수명주기와 시각화로 역할 분리 — 앱 내 세부 편집은 가치·안정성 평가 뒤 선택
+- 2026-06-26 구조화 편집 엔진 `onto.py` 추가로 Node `wp`와 Python `onto` 두 부분 구성 — `onto.py`, `requirements.txt`
+- 2026-09-29 배포 절을 추가: 공개 저장소와 selfhost Companion 링크, 스킬 저장소 `fbdeme/webprotege-cli-skill`(2026-06-26 발행) — GitHub에서 직접 확인
+- 2026-09-29 Python 환경에 venv와 `get-pip.py` 부트스트랩을 기록 — 이 머신의 python에 ensurepip이 없음

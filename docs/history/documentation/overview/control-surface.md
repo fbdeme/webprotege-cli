@@ -1,0 +1,2 @@
+- 2026-06-26 4단계 절차 확립: 프로빙 → 디컴파일 → DOM 실측 → e2e (절차 버전 v1.0) — 조사 절차 변경 이력 표
+- 2026-06-26 Apply External Edits의 diff 의미와 IRI 제약을 디컴파일과 라이브 왕복으로 확인 — `references/control-surface.md` §5

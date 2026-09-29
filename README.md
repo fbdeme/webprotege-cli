@@ -105,7 +105,7 @@ wp apply-edits my-ontology -f "$F" -m "add Pump + drives"
 > (emails become invalid language-tagged literals), so building edits on a fresh `wp export` can
 > corrupt those values. `onto`'s load sanitizer repairs these on the way in (both bare emails and
 > emails embedded mid-text), but the canonical-file route avoids the problem entirely. See
-> [`docs/strengthening.md`](docs/strengthening.md).
+> [`docs/documentation/overview/strengthening.md`](docs/documentation/overview/strengthening.md).
 
 `onto` commands: `info`, `add-class`, `add-subclass`, `add-objprop`, `add-dataprop`,
 `add-individual`, `add-annotation`, `add-disjoint`, `add-characteristic`, `add-inverse`,
@@ -130,7 +130,7 @@ It diffs bnode-free triples exactly, compares blank-node structures (reification
 restrictions) by per-predicate count, and explicitly flags dropped RDF reification. Two known-lossy
 cases it catches automatically: `@`-literal mangling (if the sanitizer ever misses one) and
 **RDF reification** — WebProtégé/OWLAPI silently drops `rdf:subject/predicate/object`, orphaning
-provenance (`docs/issues.md` #14). `onto info`/`validate` also warn when a file contains reification.
+provenance ([`docs/issues/I014.md`](docs/issues/I014.md)). `onto info`/`validate` also warn when a file contains reification.
 
 Axiom hardening (disjointness, property characteristics) goes through the same checked path:
 
@@ -180,7 +180,7 @@ optional HermiT consistency pass — and `apply-edits` syncs the result back int
 project. Both halves work today (see "Editing ontologies safely" above). Offline engine test:
 `.venv/bin/python test/onto_test.py`.
 
-Roadmap and known limits: [`docs/`](docs/) (`current_status.md`, `todo.md`, `issues.md`).
+Roadmap and known limits: [`docs/index.md`](docs/index.md) (current stage, issues, concept pages).
 
 ## License
 
